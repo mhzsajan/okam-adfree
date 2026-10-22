@@ -1,0 +1,23 @@
+# Build / decompile artifacts (never commit these)
+apktool/
+pristine/
+out/
+*.aligned
+*.apk
+*.apks
+
+# Signing key (NEVER commit)
+*.keystore
+*.jks
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Temp / logs
+*.log
+*.tmp
+
+release/
+
