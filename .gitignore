@@ -2,9 +2,12 @@
 apktool/
 pristine/
 out/
+originals/
+tools/
 *.aligned
 *.apk
 *.apks
+*.xapk
 
 # Signing key (NEVER commit)
 *.keystore

@@ -6,7 +6,7 @@ Set-Location $root
 $owner = "mhzsajan"; $repo = "okam-adfree"
 $tmp = Join-Path $env:TEMP "ghpush"; New-Item -ItemType Directory -Force -Path $tmp | Out-Null
 
-$skipDirs = @(".git","out","release","apktool","originals")
+$skipDirs = @(".git","out","release","apktool","originals","tools")
 $files = Get-ChildItem -Recurse -File | Where-Object {
     $rel = $_.FullName.Substring($root.Length+1).Replace("\","/")
     $skip = $false
