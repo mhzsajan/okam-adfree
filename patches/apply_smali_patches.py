@@ -9,6 +9,14 @@ patch is skipped (already applied). If `old` is missing AND `new` is missing:
   - required patch -> fail loudly (version drift; update the anchor, do not
     weaken it).
   - optional patch -> skip (probe cleanup on a tree that never had probes).
+
+It also strips Play's split markers from AndroidManifest.xml
+(android:requiredSplitTypes / android:splitTypes, plus the
+com.android.vending.splits.required meta-data). Without this the rebuilt
+base can never be installed on its own: PackageInstaller rejects it with
+INSTALL_FAILED_MISSING_SPLIT. (apktool auto-adds android:isSplitRequired="true"
+whenever requiredSplitTypes is present, so removing the attribute removes
+all three markers.)
 """
 
 import argparse
@@ -184,6 +192,44 @@ def apply(tree, rel, old, new, required):
     return True
 
 
+def strip_split_markers(tree):
+    """Remove Play's split requirements from the decoded manifest (idempotent).
+
+    bundletool writes these onto <manifest> of every Play-delivered base:
+        android:requiredSplitTypes="base__abi,base__density"
+        android:splitTypes=""
+    and PackageInstaller then refuses any install that does not ship the
+    matching config splits (INSTALL_FAILED_MISSING_SPLIT) — including a
+    merged universal APK. Strip them so the rebuilt base installs standalone.
+    """
+    path = os.path.join(tree, "AndroidManifest.xml")
+    if not os.path.exists(path):
+        print("MISSING FILE:", path)
+        return False
+    src = open(path, encoding="utf-8").read()
+    orig = src
+    # manifest-root attributes (attribute order is not stable across builds,
+    # so match them independently)
+    src = src.replace(' android:requiredSplitTypes="base__abi,base__density"', "")
+    src = src.replace(' android:requiredSplitTypes=""', "")
+    src = src.replace(' android:splitTypes=""', "")
+    # Play Store marker inside <application>
+    src = src.replace(
+        '        <meta-data android:name="com.android.vending.splits.required"'
+        ' android:value="true"/>\n',
+        "",
+    )
+    if "requiredSplitTypes" in src or "splits.required" in src:
+        print("SPLIT MARKERS STILL PRESENT in", path, "- check the anchor")
+        return False
+    if src != orig:
+        open(path, "w", encoding="utf-8", newline="").write(src)
+        print("stripped split markers from AndroidManifest.xml")
+    else:
+        print("manifest already clean (no split markers)")
+    return True
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tree", default="apktool")
@@ -192,6 +238,8 @@ def main():
     for rel, old, new, required in PATCHES:
         if not apply(args.tree, rel, old, new, required):
             ok = False
+    if not strip_split_markers(args.tree):
+        ok = False
     if not ok:
         sys.exit(1)
     print("all required patches applied")

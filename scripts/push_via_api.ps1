@@ -39,8 +39,13 @@ if ($LASTEXITCODE -ne 0) { throw "tree failed: $treeResp" }
 $treeSha = ($treeResp | ConvertFrom-Json).sha
 Write-Host "tree -> $treeSha"
 
-# 3. create commit
-$commitBody = @{ message = "Initial commit: O-KAM Pro ad-free patch (v1.0.0)"; tree = $treeSha; parents = @() } | ConvertTo-Json -Depth 5 -Compress
+# 3. create commit (parent = current main tip, so history chains properly)
+$parentSha = $null
+$refResp = gh api "repos/$owner/$repo/git/ref/heads/main" 2>$null
+if ($LASTEXITCODE -eq 0) { $parentSha = ($refResp | ConvertFrom-Json).object.sha }
+$msg = if ($args.Count -gt 0) { $args[0] } else { "Update via push_via_api.ps1" }
+if ($parentSha) { Write-Host "current main -> $parentSha (will chain)" }
+$commitBody = @{ message = $msg; tree = $treeSha; parents = @($parentSha) } | ConvertTo-Json -Depth 5 -Compress
 $commitFile = Join-Path $tmp "commit.json"
 [IO.File]::WriteAllText($commitFile, $commitBody)
 $commitResp = gh api "repos/$owner/$repo/git/commits" --method POST --input $commitFile 2>&1
@@ -48,11 +53,15 @@ if ($LASTEXITCODE -ne 0) { throw "commit failed: $commitResp" }
 $commitSha = ($commitResp | ConvertFrom-Json).sha
 Write-Host "commit -> $commitSha"
 
-# 4. create main ref
-$refBody = @{ ref = "refs/heads/main"; sha = $commitSha } | ConvertTo-Json -Compress
+# 4. update main ref (create it on first push, force-update afterwards)
+$refBody = @{ ref = "refs/heads/main"; sha = $commitSha; force = $true } | ConvertTo-Json -Compress
 $refFile = Join-Path $tmp "ref.json"
 [IO.File]::WriteAllText($refFile, $refBody)
-$refResp = gh api "repos/$owner/$repo/git/refs" --method POST --input $refFile 2>&1
+if ($parentSha) {
+    $refResp = gh api "repos/$owner/$repo/git/refs/heads/main" --method PATCH --input $refFile 2>&1
+} else {
+    $refResp = gh api "repos/$owner/$repo/git/refs" --method POST --input $refFile 2>&1
+}
 if ($LASTEXITCODE -ne 0) { throw "ref failed: $refResp" }
 Write-Host "ref main -> $commitSha"
 

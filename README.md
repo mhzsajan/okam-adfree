@@ -25,16 +25,42 @@ Result: no ad is requested, no ad is shown, no busy loop, CPU stays at ~3–7%.
 
 ## Release
 
-The ready-to-install APK set is attached to the
-[latest release](https://github.com/mhzsajan/okam-adfree/releases/latest).
-Install with:
+Two install options are attached to the
+[latest release](https://github.com/mhzsajan/okam-adfree/releases/latest):
+
+| file | what it is |
+|---|---|
+| **`O-KAM-Pro-3.0.17-adfree.apk`** | **single universal APK — use this one.** All code, resources and native libs in one file; installs like any normal APK. |
+| `base.apk` + 3 × `split_config.*.apk` | the original 4-file split set, kept as a fallback. |
+
+### Recommended: the single universal APK
+
+Copy it to the phone and tap it (or via adb):
+
+```powershell
+adb install -r O-KAM-Pro-3.0.17-adfree.apk
+```
+
+The universal APK is the Play base + the arm64-v8a libs merged into one file,
+with Play's split markers (`android:requiredSplitTypes` / `isSplitRequired`)
+stripped from the manifest — without that strip PackageInstaller rejects any
+single-file build with `INSTALL_FAILED_MISSING_SPLIT`. The `en` and `xxhdpi`
+splits are not merged and not needed: the base already carries unqualified
+**English** strings (its string pool has no Devanagari at all) and every
+density bucket (`mdpi`…`xxxhdpi`). Verified on-device: English UI, live camera,
+no ads.
+
+An upgrade over an existing split install (`-r`) works and keeps the app data
+(you stay logged in).
+
+### Fallback: the split set
 
 ```powershell
 adb install-multiple -r --no-incremental base.apk split_config.arm64_v8a.apk split_config.en.apk split_config.xxhdpi.apk
 ```
 
-The app data is preserved (you stay logged in). Only the main profile (user 0)
-is touched — the Secure Folder copy must be removed manually (see below).
+Only the main profile (user 0) is touched — the Secure Folder copy must be
+removed manually (see below).
 
 ## How to rebuild for a future app update
 
@@ -46,7 +72,9 @@ re-discover them). The short version:
 # 1. decompile
 apktool d base.apk -o apktool
 
-# 2. apply smali patches (idempotent, fails loudly if anchors drift)
+# 2. apply smali patches (idempotent, fails loudly if anchors drift).
+#    This also strips Play's split markers from AndroidManifest.xml, which is
+#    what makes a standalone (universal) install possible.
 python patches/apply_smali_patches.py --tree apktool
 
 # 3. rebuild + sign base
@@ -62,8 +90,19 @@ zipalign -p -f 4 split_patched.arm64_v8a.apk split_patched.aligned
 apksigner sign ... --out out\split_config.arm64_v8a.apk split_patched.aligned
 # (en / xxhdpi splits are signed unchanged)
 
-# 5. install
-adb install-multiple -r --no-incremental out\base.apk out\split_config.arm64_v8a.apk out\split_config.en.apk out\split_config.xxhdpi.apk
+# 5. build the single universal APK (base + arm64 libs merged)
+python patches/merge_universal.py --base out\base.apk `
+  --abi-split out\split_config.arm64_v8a.apk --dst universal.apk
+zipalign -p -f 4 universal.apk universal.aligned
+apksigner sign --ks okam.keystore --ks-key-alias okam --ks-pass pass:okam123 --key-pass pass:okam123 `
+  --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true `
+  --out O-KAM-Pro-<version>-adfree.apk universal.aligned
+aapt2 dump xmltree O-KAM-Pro-<version>-adfree.apk --file AndroidManifest.xml | findstr Split
+#    -> must print NOTHING (no split markers). If requiredSplitTypes survives,
+#       step 2 did not run on this tree.
+
+# 6. install (universal is enough; the split set also still works)
+adb install -r O-KAM-Pro-<version>-adfree.apk
 ```
 
 `scripts/build.ps1` automates steps 1–4. `scripts/verify.ps1` runs the
