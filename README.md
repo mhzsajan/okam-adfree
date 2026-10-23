@@ -25,13 +25,10 @@ Result: no ad is requested, no ad is shown, no busy loop, CPU stays at ~3–7%.
 
 ## Release
 
-Two install options are attached to the
-[latest release](https://github.com/mhzsajan/okam-adfree/releases/latest):
-
-| file | what it is |
+| release | files |
 |---|---|
-| **`O-KAM-Pro-3.0.17-adfree.apk`** | **single universal APK — use this one.** All code, resources and native libs in one file; installs like any normal APK. |
-| `base.apk` + 3 × `split_config.*.apk` | the original 4-file split set, kept as a fallback. |
+| **[v1.0.1 — latest](https://github.com/mhzsajan/okam-adfree/releases/tag/v1.0.1)** | **`O-KAM-Pro-3.0.17-adfree.apk` — single universal APK. Use this one.** All code, resources and native libs in one file; installs like any normal APK. |
+| [v1.0.0](https://github.com/mhzsajan/okam-adfree/releases/tag/v1.0.0) | the original 4-file split set (`base.apk` + 3 × `split_config.*.apk`), kept as a fallback. |
 
 ### Recommended: the single universal APK
 

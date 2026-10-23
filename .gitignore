@@ -21,3 +21,4 @@ desktop.ini
 
 release/
 
+__pycache__/
